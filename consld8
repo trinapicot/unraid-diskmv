@@ -1,0 +1,65 @@
+#!/bin/bash
+# consld8 - Consolidate an unRAID user share directory onto a single disk.
+#
+# usage: consld8 /path/to/user/share/directory [disk#]
+#   
+
+# Set shell options
+shopt -s nullglob  #remove words with no matching filenames
+
+# Process input parameters
+if [ -d "$1" ]
+then
+  FULLNAME=$(readlink -e "$1")   # Handle relative path
+  SRCDIR=${FULLNAME#/mnt/*/}   # Remove any /mnt/*/ prefix
+else
+  SRCDIR="$1"
+fi
+
+if [ ! -d "/mnt/user/$SRCDIR" ]
+then 
+  echo "$1 is not a valid user share"
+  exit 1
+fi
+
+DESTDISK=${2#/mnt/}    #Remove any leading /mnt/ prefix
+DESTDISK=${DESTDISK%%/*}    #Remove any trailing path
+if [[ ! -d "/mnt/$DESTDISK" || "$DESTDISK" != disk[1-9] && "$DESTDISK" != disk[1-9][0-9] ]]
+then
+  echo "Script will determine destination disk"
+  DESTDISK=''
+fi
+
+SHSIZE=$(du -s /mnt/user/$SRCDIR | cut -f 1)
+echo /mnt/user/$SRCDIR $SHSIZE
+
+# Get disk usage
+# If disk# not specified, determine the destination disk
+if [ "x$DESTDISK" == 'x' ]; then
+MAXUSAGE=0
+for d in /mnt/disk[1-9]{,[0-9]}
+  do
+  if [ -d $d/$SRCDIR ]; then
+    DUSAGE=$(du -s $d/$SRCDIR | cut -f 1)
+    DFREE=$(df $d | grep $d | awk '{ print $4 }' )  #Disk free space
+    echo "$d/$SRCDIR" used: $DUSAGE free: $DFREE
+    ODUSAGE=$(($SHSIZE-$DUSAGE))  #Other Disk Usage
+    if [ "$DUSAGE" -gt "$MAXUSAGE" -a "$DFREE" -gt "$ODUSAGE" ]; then
+      MAXUSAGE=$DUSAGE
+      DESTDISK=${d#/mnt/}  #Remove any leading /mnt/ prefix
+      echo "$DESTDISK is max so far"
+    fi 
+  fi #source directory is on current disk
+done
+fi #destination disk not specified
+
+# todo: what happens if there is not enough free space on one disk?
+
+# Loop through disks and merge source directory onto destination disk
+for d in /mnt/{disk[1-9]{,[0-9]},cache[e]}
+do
+  if [ -d $d/$SRCDIR -a /mnt/$DESTDISK != $d ]; then
+    echo "Merge $d/$SRCDIR onto $DESTDISK"
+  fi
+done
+ 

@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# The 'find' command generates a list of all files and directories in the user share directory on the source disk.
+# For each file, if the file is not "in use" by any process (as detected by 'fuser' command),
+# then the file is copied to the destination disk, and upon success, deleted from the source disk.
+# For each directory, if the directory is empty, then the directory is copied tothe destination disk,
+# and upon success, deleted from the cache disk.
+
+# For each file or directory, we use 'rsync' to copy the file or directory to the destination disk.
+# We specify the proper options to rsync so that files and directories get copied to the
+# destination disk while preserving ownership, permissions, access timess, and extended attributes (this
+# is why we use rsync: a simple mv command will not preserve all metadata properly).
+
+if [ -d "$1" ]
+then
+  FULLNAME=$(readlink -e "$1")   # Handle relative path
+  MERGEDIR=${FULLNAME#/mnt/*/}   # Remove any /mnt/*/ prefix
+else
+  MERGEDIR="$1"
+fi
+
+if [ ! -d "/mnt/user/$MERGEDIR" ]
+then 
+  echo "$1 is not a valid user share"
+  exit 1
+fi
+
+SRCDISK=${2#/mnt/}    #Remove any leading /mnt/ prefix
+SRCDISK=${SRCDISK%%/*}    #Remove any trailing path
+if [ ! -d "/mnt/$SRCDISK" -o ${SRCDISK:0:4} != "disk" ]
+then
+  echo "$2 is not a valid disk"
+  exit 1
+fi
+
+DESTDISK=${3#/mnt/}    #Remove any leading /mnt/ prefix
+DESTDISK=${DESTDISK%%/*}    #Remove any trailing path
+if [[ ! -d "/mnt/$DESTDISK" || "$DESTDISK" != disk[1-9] && "$DESTDISK" != disk[1-9][0-9] ]]
+then
+  echo "$3 is not a valid disk"
+  exit 1
+fi
+
+echo "Merging /mnt/$SRCDISK/$MERGEDIR into /mnt/$DESTDISK/$MERGEDIR"
+cd /mnt/$SRCDISK
+
+find "./$MERGEDIR" -depth \( \( -type f ! -exec fuser -s {} \; \) -o \( -type d -empty \) \) -print \
+    -exec rsync -i -dIWRpEAXogt --numeric-ids --inplace {} /mnt/${DESTDISK}/ \; -delete
+
+echo "merger finished"
