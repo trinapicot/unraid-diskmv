@@ -1,15 +1,13 @@
 #!/bin/bash
 
-# The 'find' command generates a list of all files and directories in the user share directory on the source disk.
-# For each file, if the file is not "in use" by any process (as detected by 'fuser' command),
-# then the file is copied to the destination disk, and upon success, deleted from the source disk.
-# For each directory, if the directory is empty, then the directory is copied tothe destination disk,
-# and upon success, deleted from the cache disk.
+# usage: merger sourcedirectory sourcedisk destinationdisk
+#
+# sourcedirectory is any user share directory
+# sourcedisk is an array disk that contains the sourcedirectory (example: disk4 or /mnt/disk4)
+# destinationdisk is an array disk to which the sourcederectory should be copied (example: disk2 or /mnt/disk2)
 
-# For each file or directory, we use 'rsync' to copy the file or directory to the destination disk.
-# We specify the proper options to rsync so that files and directories get copied to the
-# destination disk while preserving ownership, permissions, access timess, and extended attributes (this
-# is why we use rsync: a simple mv command will not preserve all metadata properly).
+# The same find/rsync structure used in the unraid mover script is used to copy files and directories and then 
+# delete only if the copy succeeds
 
 if [ -d "$1" ]
 then
