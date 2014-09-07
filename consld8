@@ -30,8 +30,8 @@ then
   DESTDISK=''
 fi
 
-SHSIZE=$(du -s /mnt/user/$SRCDIR | cut -f 1)
-echo /mnt/user/$SRCDIR $SHSIZE
+SHSIZE=$(du -s "/mnt/user/$SRCDIR" | cut -f 1)
+echo "/mnt/user/$SRCDIR" $SHSIZE
 
 # Get disk usage
 # If disk# not specified, determine the destination disk
@@ -39,9 +39,9 @@ if [ "x$DESTDISK" == 'x' ]; then
 MAXUSAGE=0
 for d in /mnt/disk[1-9]{,[0-9]}
   do
-  if [ -d $d/$SRCDIR ]; then
-    DUSAGE=$(du -s $d/$SRCDIR | cut -f 1)
-    DFREE=$(df $d | grep $d | awk '{ print $4 }' )  #Disk free space
+  if [ -d "$d/$SRCDIR" ]; then
+    DUSAGE=$(du -s "$d/$SRCDIR" | cut -f 1)
+    DFREE=$(df "$d" | grep "$d" | awk '{ print $4 }' )  #Disk free space
     echo "$d/$SRCDIR" used: $DUSAGE free: $DFREE
     ODUSAGE=$(($SHSIZE-$DUSAGE))  #Other Disk Usage
     if [ "$DUSAGE" -gt "$MAXUSAGE" -a "$DFREE" -gt "$ODUSAGE" ]; then
@@ -58,7 +58,7 @@ fi #destination disk not specified
 # Loop through disks and merge source directory onto destination disk
 for d in /mnt/{disk[1-9]{,[0-9]},cache[e]}
 do
-  if [ -d $d/$SRCDIR -a /mnt/$DESTDISK != $d ]; then
+  if [ -d "$d/$SRCDIR" -a "/mnt/$DESTDISK" != "$d" ]; then
     echo "Merge $d/$SRCDIR onto $DESTDISK"
   fi
 done
