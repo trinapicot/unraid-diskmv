@@ -25,7 +25,9 @@ fi
 
 SRCDISK=${2#/mnt/}    #Remove any leading /mnt/ prefix
 SRCDISK=${SRCDISK%%/*}    #Remove any trailing path
-if [ ! -d "/mnt/$SRCDISK" -o ${SRCDISK:0:4} != "disk" ]
+if [ ! -d "/mnt/$SRCDISK" \
+    -o "${SRCDISK:0:4}" != "disk" -a "$SRCDISK" != "cache" \
+   ]
 then
   echo "$2 is not a valid disk"
   exit 1
@@ -33,7 +35,9 @@ fi
 
 DESTDISK=${3#/mnt/}    #Remove any leading /mnt/ prefix
 DESTDISK=${DESTDISK%%/*}    #Remove any trailing path
-if [[ ! -d "/mnt/$DESTDISK" || "$DESTDISK" != disk[1-9] && "$DESTDISK" != disk[1-9][0-9] ]]
+if [[ ! -d "/mnt/$DESTDISK" \
+     || "$DESTDISK" != disk[1-9] && "$DESTDISK" != disk[1-9][0-9] && "$DESTDISK" != "cache" \
+   ]]
 then
   echo "$3 is not a valid disk"
   exit 1
