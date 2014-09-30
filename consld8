@@ -4,9 +4,6 @@
 # usage: consld8 [options:-h|-t|-f|-v] /path/to/user/share/directory [disk#]
 #   
 
-# Set shell options
-shopt -s nullglob  #remove words with no matching filenames
-
 usage(){
 cat << EOF
 usage: consld8 [options:-h|-t|-f|-v] directory [disk#]
@@ -26,6 +23,9 @@ options:
   -v    Print more information.
 EOF
 }
+
+# Set shell options
+shopt -s nullglob  #remove words with no matching filenames
 
 # Process options
 verbose=0
@@ -89,11 +89,11 @@ else
 fi
 
 SHSIZE=$(du -s "/mnt/user/$SRCDIR" | cut -f 1)
-[ $verbose -gt 0 ] && echo "/mnt/user/$SRCDIR" $SHSIZE
+[ $verbose -gt 0 ] && echo "/mnt/user/$SRCDIR  Total usage: $SHSIZE"
 
 # If disk# not specified, determine the destination disk
 if [ "$DESTDISK" == 'auto' ]; then
-  [ $verbose -gt 0 ] && echo "merger will determine destination disk"
+  [ $verbose -gt 0 ] && echo "$0 will determine destination disk"
   MAXUSAGE=-1
   for d in /mnt/disk[1-9]{,[0-9]}
     do
@@ -108,7 +108,7 @@ if [ "$DESTDISK" == 'auto' ]; then
     if [ "$DUSAGE" -gt "$MAXUSAGE" -a "$DFREE" -gt "$ODUSAGE" ]; then
       MAXUSAGE=$DUSAGE
       DESTDISK=${d#/mnt/}  #Remove any leading /mnt/ prefix
-      [ $verbose -gt 0 ] && echo "$DESTDISK is max so far"
+      [ $verbose -gt 1 ] && echo "$DESTDISK is max so far"
     fi 
   done
   if [ "$DESTDISK" == 'auto' ]; then
@@ -116,7 +116,7 @@ if [ "$DESTDISK" == 'auto' ]; then
     exit 3
   fi
 else #destination is disk specified
-  [ $verbose -gt 0 ] && echo "merger started"
+  [ $verbose -gt 0 ] && echo "Destination disk has been specified: $DESTDISK"
   if [ -d "/mnt/$DESTDISK/$SRCDIR" ]; then
     DUSAGE=$(du -s "/mnt/$DESTDISK/$SRCDIR" | cut -f 1)
   else
@@ -136,7 +136,7 @@ for d in /mnt/{disk[1-9]{,[0-9]},cache[e]}
 #                                     ^^^
 #  this extra [e] is to force pattern matching and with shopt -s nullglob
 #  will not produce an error if cache does not exist. But it might cause
-#  problems if there happens to be a files named '/mnt/cachee'
+#  problems if there happens to be a directory named '/mnt/cachee'
 do
   if [ -d "$d/$SRCDIR" -a "/mnt/$DESTDISK" != "$d" ]; then
     [ $verbose -gt 0 ] && echo "Merge $d/$SRCDIR onto $DESTDISK"
