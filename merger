@@ -46,7 +46,21 @@ fi
 echo "Merging /mnt/$SRCDISK/$MERGEDIR into /mnt/$DESTDISK/$MERGEDIR"
 cd /mnt/$SRCDISK
 
-find "./$MERGEDIR" -depth \( \( -type f ! -exec fuser -s {} \; \) -o \( -type d -empty \) \) -print \
-    -exec rsync -i -dIWRpEAXogt --numeric-ids --inplace {} /mnt/${DESTDISK}/ \; -delete
+find "./$MERGEDIR" -depth \
+      \( \
+        \( -type f ! -exec fuser -s {} \; \) \
+        -o \
+        \( -type d -empty \) \
+      \) \
+      -print \
+      \( \
+        -exec [ ! -e "/mnt/$DESTDISK/{}" ] \; \
+        -o \
+        -exec echo "Duplicate skipped: {}" \; \
+        -a \
+        -exec false \; \
+      \) \
+      -exec rsync -i -dIWRpEAXogt --numeric-ids --inplace {} /mnt/${DESTDISK}/ \; \
+      -delete
 
 echo "merger finished"
