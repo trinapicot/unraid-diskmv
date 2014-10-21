@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# usage: merger sourcedirectory sourcedisk destinationdisk
+# usage: diskmv sourcedirectory sourcedisk destinationdisk
 #
 # sourcedirectory is any user share directory
 # sourcedisk is an array disk that contains the sourcedirectory (example: disk4 or /mnt/disk4)
@@ -54,7 +54,7 @@ find "./$MERGEDIR" -depth \
       \) \
       -print \
       \( \
-        -exec [ ! -e "/mnt/$DESTDISK/{}" ] \; \
+        -exec [ ! -f "/mnt/$DESTDISK/{}" ] \; \
         -o \
         -exec echo "Duplicate skipped: {}" \; \
         -a \
@@ -63,4 +63,4 @@ find "./$MERGEDIR" -depth \
       -exec rsync -i -dIWRpEAXogt --numeric-ids --inplace {} /mnt/${DESTDISK}/ \; \
       -delete
 
-echo "merger finished"
+echo "diskmv finished"

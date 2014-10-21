@@ -141,7 +141,7 @@ do
   if [ -d "$d/$SRCDIR" -a "/mnt/$DESTDISK" != "$d" ]; then
     [ $verbose -gt 0 ] && echo "Merge $d/$SRCDIR onto $DESTDISK"
     if [ $doit == 'true' ]; then
-      merger "$SRCDIR" "$d" "$DESTDISK"
+      diskmv "$SRCDIR" "$d" "$DESTDISK"
     fi
   fi
 done
