@@ -136,16 +136,18 @@ else #destination is disk specified
 fi 
 
 # Loop through disks and merge source directory onto destination disk
-for d in /mnt/{disk[1-9]{,[0-9]},cache[e]}
-#                                     ^^^
-#  this extra [e] is to force pattern matching and with shopt -s nullglob
-#  will not produce an error if cache does not exist. But it might cause
-#  problems if there happens to be a directory named '/mnt/cachee'
+for d in /mnt/{disk[1-9]{,[0-9]},cach[e]}
+#                                    ^ ^
+#  the backets are to force pattern matching and with shopt -s nullglob
+#  will not produce an error if cache does not exist. 
 do
+  [ $verbose -gt 1 ] && echo "Checking $d ..."
   if [ -d "$d/$SRCDIR" -a "/mnt/$DESTDISK" != "$d" ]; then
     [ $verbose -gt 0 ] && echo "Merge $d/$SRCDIR onto $DESTDISK"
     if [ $doit == 'true' ]; then
       diskmv "$SRCDIR" "$d" "$DESTDISK"
+    else
+      echo "Running in test mode, no files moved."
     fi
   fi
 done
