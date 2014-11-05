@@ -21,6 +21,7 @@ options:
   -t    Perform a test run. No files will be moved.
   -f    Override test mode and force valid moves to be performed.
   -v    Print more information.
+  -q    Prent less information.
 EOF
 }
 
@@ -28,7 +29,7 @@ EOF
 shopt -s nullglob  #remove words with no matching filenames
 
 # Process options
-verbose=0
+verbose=1
 doit='false' # Default to test mode where no files are moved
 
 while :; do
@@ -45,6 +46,9 @@ while :; do
       ;;
     -v|--verbose)
       verbose=$((verbose + 1)) # Each -v argument adds 1 to verbosity
+      ;;
+    -q|--quiet)
+      verbose=$((verbose - 1)) # Each -q argument subtracts 1 from verbosity
       ;;
     --) # End of all options
       break
