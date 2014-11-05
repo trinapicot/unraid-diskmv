@@ -4,10 +4,10 @@
 #
 # sourcedirectory is any user share directory
 # sourcedisk is an array disk that contains the sourcedirectory (example: disk4 or /mnt/disk4)
-# destinationdisk is an array disk to which the sourcederectory should be copied (example: disk2 or /mnt/disk2)
+# destinationdisk is an array disk to which the sourcedirectory should be copied (example: disk2 or /mnt/disk2)
 
-# The same find/rsync structure used in the unraid mover script is used to copy files and directories and then 
-# delete only if the copy succeeds
+# A find/rsync structure is used to copy files and directories and then 
+# delete only if the copy succeed, similar to the unRAID mover script.
 
 if [ -d "$1" ]
 then
@@ -25,9 +25,9 @@ fi
 
 SRCDISK=${2#/mnt/}    #Remove any leading /mnt/ prefix
 SRCDISK=${SRCDISK%%/*}    #Remove any trailing path
-if [ ! -d "/mnt/$SRCDISK" \
-    -o "${SRCDISK:0:4}" != "disk" -a "$SRCDISK" != "cache" \
-   ]
+if [[ ! -d "/mnt/$SRCDISK" \
+     || "$SRCDISK" != disk[1-9] && "$SRCDISK" != disk[1-9][0-9] && "$SRCDISK" != "cache" \
+   ]]
 then
   echo "$2 is not a valid disk"
   exit 1
