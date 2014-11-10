@@ -1,12 +1,12 @@
 #!/bin/bash
 # consld8 - Consolidate an unRAID user share directory onto a single disk.
 #
-# usage: consld8 [options:-h|-t|-f|-v] /path/to/user/share/directory [disk#]
+# usage: consld8 [options:-h|-t|-f|-v|-q] /path/to/user/share/directory [disk#]
 #   
 
 usage(){
 cat << EOF
-usage: consld8 [options:-h|-t|-f|-v] directory [disk#]
+usage: consld8 [options:-h|-t|-f|-v|-q] directory [disk#]
 
 directory    Any directory that is contained in the user share file system.
              It can be specified as an absolute or relative path and can be 
@@ -21,7 +21,7 @@ options:
   -t    Perform a test run. No files will be moved.
   -f    Override test mode and force valid moves to be performed.
   -v    Print more information.
-  -q    Prent less information.
+  -q    Print less information.
 EOF
 }
 
