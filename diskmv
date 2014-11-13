@@ -1,50 +1,96 @@
 #!/bin/bash
-
-# usage: diskmv sourcedirectory sourcedisk destinationdisk
+# diskmv - Move an unRAID user share directory from one disk to another
 #
-# sourcedirectory is any user share directory
-# sourcedisk is an array disk that contains the sourcedirectory (example: disk4 or /mnt/disk4)
-# destinationdisk is an array disk to which the sourcedirectory should be copied (example: disk2 or /mnt/disk2)
-
+# usage: diskmv directory srcdisk destdisk
+#
 # A find/rsync structure is used to copy files and directories and then 
 # delete only if the copy succeed, similar to the unRAID mover script.
+
+usage(){
+cat << EOF
+
+usage: diskmv directory srcdisk destdisk
+
+All parameters are required
+
+directory    Any directory that is contained in the user share file system.
+             It can be specified as an absolute or relative path and can be 
+             relative to the current directory or the /mnt/user/ directory.  
+
+srcdisk      Source disk which can be any valid disk in the unraid array. 
+             Examples: 'disk2', 'disk18' or 'cache'.
+
+destdisk     Destination disk which can be any valid disk in the unraid array.
+             Examples: 'disk2', 'disk18' or 'cache'.
+
+EOF
+}
+
+[ ${DEBUG:=0} -gt 0 ] && set -x -v
 
 if [ -d "$1" ]
 then
   FULLNAME=$(readlink -e "$1")   # Handle relative path
-  MERGEDIR=${FULLNAME#/mnt/*/}   # Remove any /mnt/*/ prefix
+  MERGEDIR="${FULLNAME#/mnt/*/}"   # Remove any /mnt/*/ prefix
 else
   MERGEDIR="$1"
 fi
 
 if [ ! -d "/mnt/user/$MERGEDIR" ]
 then 
-  echo "$1 is not a valid user share"
+  echo "'$1' is not a valid user share directory."
+  usage
   exit 1
 fi
 
-SRCDISK=${2#/mnt/}    #Remove any leading /mnt/ prefix
-SRCDISK=${SRCDISK%%/*}    #Remove any trailing path
+if [ -z $2 -o -z $3 ]
+then
+  echo "Both source and destination disks must be specified." 
+  usage
+  exit 1
+fi
+
+SRCDISK="${2#/mnt/}"    #Remove any leading /mnt/ prefix
+SRCDISK="${SRCDISK%%/*}"    #Remove any trailing path
 if [[ ! -d "/mnt/$SRCDISK" \
      || "$SRCDISK" != disk[1-9] && "$SRCDISK" != disk[1-9][0-9] && "$SRCDISK" != "cache" \
    ]]
 then
-  echo "$2 is not a valid disk"
+  echo "'$2' is not a valid disk."
+  usage
   exit 1
 fi
 
-DESTDISK=${3#/mnt/}    #Remove any leading /mnt/ prefix
-DESTDISK=${DESTDISK%%/*}    #Remove any trailing path
+DESTDISK="${3#/mnt/}"    #Remove any leading /mnt/ prefix
+DESTDISK="${DESTDISK%%/*}"    #Remove any trailing path
 if [[ ! -d "/mnt/$DESTDISK" \
      || "$DESTDISK" != disk[1-9] && "$DESTDISK" != disk[1-9][0-9] && "$DESTDISK" != "cache" \
    ]]
 then
-  echo "$3 is not a valid disk"
+  echo "'$3' is not a valid disk."
+  usage
   exit 1
 fi
 
+RSYNCOPTS="-i -dIWRpEAXogt --numeric-ids --inplace"
+# rsync options used:
+# -i, --itemize-changes       output a change-summary for all updates
+# -d, --dirs                  transfer directories without recursing
+# -I, --ignore-times          don't skip files that match in size and mod-time
+# -W, --whole-file            copy files whole (without delta-xfer algorithm)
+# -R, --relative              use relative path names
+# -p, --perms                 preserve permissions
+# -E, --executability         preserve the file's executability
+# -A, --acls                  preserve ACLs (implies --perms)
+# -X, --xattrs                preserve extended attributes
+# -o, --owner                 preserve owner (super-user only)
+# -g, --group                 preserve group
+# -t, --times                 preserve modification times
+#     --numeric-ids           don't map uid/gid values by user/group name
+#     --inplace               update destination files in-place
+
 echo "Merging /mnt/$SRCDISK/$MERGEDIR into /mnt/$DESTDISK/$MERGEDIR"
-cd /mnt/$SRCDISK
+cd "/mnt/$SRCDISK"
 
 find "./$MERGEDIR" -depth \
       \( \
@@ -60,7 +106,7 @@ find "./$MERGEDIR" -depth \
         -a \
         -exec false \; \
       \) \
-      -exec rsync -i -dIWRpEAXogt --numeric-ids --inplace {} /mnt/${DESTDISK}/ \; \
+      -exec rsync $RSYNCOPTS {} "/mnt/${DESTDISK}/" \; \
       -delete
 
 echo "diskmv finished"

@@ -6,6 +6,7 @@
 
 usage(){
 cat << EOF
+
 usage: consld8 [options:-h|-t|-f|-v|-q] directory [disk#]
 
 directory    Any directory that is contained in the user share file system.
@@ -25,6 +26,8 @@ options:
 EOF
 }
 
+[ ${DEBUG:=0} -gt 0 ] && set -x -v
+
 # Set shell options
 shopt -s nullglob  #remove words with no matching filenames
 
@@ -33,7 +36,7 @@ verbose=1
 doit='false' # Default to test mode where no files are moved
 
 while :; do
-  case $1 in
+  case "$1" in
     -h|-\?|--help)
       usage
       exit 0
@@ -66,14 +69,14 @@ done
 if [ -d "$1" ]
 then
   FULLNAME=$(readlink -e "$1")   # Handle relative path
-  SRCDIR=${FULLNAME#/mnt/*/}   # Remove any /mnt/*/ prefix
+  SRCDIR="${FULLNAME#/mnt/*/}"   # Remove any /mnt/*/ prefix
 else
   SRCDIR="$1"
 fi
 
 if [ ! -d "/mnt/user/$SRCDIR" ]
 then 
-  echo "$1 is not a valid user share" >&2
+  echo "'$1' is not a valid user share." >&2
   usage
   exit 1
 fi
@@ -82,11 +85,11 @@ if [ -z "$2" ]
 then
   DESTDISK='auto'
 else
-  DESTDISK=${2#/mnt/}    #Remove any leading /mnt/ prefix
-  DESTDISK=${DESTDISK%%/*}    #Remove any trailing path
+  DESTDISK="${2#/mnt/}"    #Remove any leading /mnt/ prefix
+  DESTDISK="${DESTDISK%%/*}"    #Remove any trailing path
   if [[ ! -d "/mnt/$DESTDISK" || "$DESTDISK" != disk[1-9] && "$DESTDISK" != disk[1-9][0-9] ]]
   then
-    echo "$2 is not a valid destination disk" >&2
+    echo "'$2' is not a valid destination disk." >&2
     usage
     exit 2
   fi
@@ -107,11 +110,11 @@ if [ "$DESTDISK" == 'auto' ]; then
       DUSAGE=0
     fi #source directory is on current disk
     DFREE=$(df "$d" | grep "$d" | awk '{ print $4 }' )  #Disk free space
-    [ $verbose -gt 0 ] && echo "$d/$SRCDIR" used: $DUSAGE free: $DFREE
+    [ $verbose -gt 0 ] && echo "$d/$SRCDIR used: $DUSAGE free: $DFREE"
     ODUSAGE=$(($SHSIZE-$DUSAGE))  #Other Disk Usage
     if [ "$DUSAGE" -gt "$MAXUSAGE" -a "$DFREE" -gt "$ODUSAGE" ]; then
-      MAXUSAGE=$DUSAGE
-      DESTDISK=${d#/mnt/}  #Remove any leading /mnt/ prefix
+      MAXUSAGE="$DUSAGE"
+      DESTDISK="${d#/mnt/}"  #Remove any leading /mnt/ prefix
       [ $verbose -gt 1 ] && echo "$DESTDISK is max so far"
     fi 
   done
