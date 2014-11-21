@@ -23,10 +23,66 @@ srcdisk      Source disk which can be any valid disk in the unraid array.
 destdisk     Destination disk which can be any valid disk in the unraid array.
              Examples: 'disk2', 'disk18' or 'cache'.
 
+Options:
+
+-t	test mode, do not copy or delete files
+-f	force, override test mode and take action
+-k	keep source files, do not delete after successful copy
+-l	link, copy symlinks as symlinks, default is to ignore symlinks
+-c	clobber, duplicates on destination will be overwritten
+-v	verbose, output more information
+-q	quiet, output less information
+-h	help, print this help message
+
 EOF
 }
 
 [ ${DEBUG:=0} -gt 0 ] && set -x -v
+
+doit='true'   # Default to take action instead of dry-run
+keepsrc='false'   # Delete source files by default if copy works
+symlinks='false'  # Default rsync to not copy symlinks as symlinks
+clobber='false'   # Default to skip duplicates
+verbose=1	# Default to output some but not all info
+
+while :; do
+  case "$1" in
+    -h|-\?|--help)
+      usage
+      exit 0
+      ;;
+    -t|--test) # Specify test mode where no files are moved
+      doit='false'
+      ;;
+    -f|--force) # Override test mode and force action
+      doit='true'
+      ;;
+    -k|--keepsource) # Do not delete any source files
+      keepsrc='true'
+      ;;
+    -l|--links) # Copy symlinks as symlinks
+      symlinks='true'
+      ;;
+    -c|--clobber) # Clobber duplicates on destination
+      clobber='true'
+      ;;
+    -v|--verbose)
+      verbose=$((verbose + 1)) # Each -v argument adds 1 to verbosity
+      ;;
+    -q|--quiet)
+      verbose=$((verbose - 1)) # Each -q argument subtracts 1 from verbosity
+      ;;
+    --) # End of all options
+      break
+      ;;
+    -?*)
+      echo "Unknown option (ignored): $1" >&2
+      ;;
+    *) # Default case: if no more options then break out of loop
+      break
+  esac
+  shift
+done
 
 if [ -d "$1" ]
 then
@@ -38,15 +94,15 @@ fi
 
 if [ ! -d "/mnt/user/$MERGEDIR" ]
 then 
-  echo "'$1' is not a valid user share directory."
-  usage
+  echo "'$1' is not a valid user share directory." >&2
+  usage >&2
   exit 1
 fi
 
 if [ -z $2 -o -z $3 ]
 then
-  echo "Both source and destination disks must be specified." 
-  usage
+  echo "Both source and destination disks must be specified."  >&2
+  usage >&2
   exit 1
 fi
 
@@ -56,8 +112,8 @@ if [[ ! -d "/mnt/$SRCDISK" \
      || "$SRCDISK" != disk[1-9] && "$SRCDISK" != disk[1-9][0-9] && "$SRCDISK" != "cache" \
    ]]
 then
-  echo "'$2' is not a valid disk."
-  usage
+  echo "'$2' is not a valid disk." >&2
+  usage >&2
   exit 1
 fi
 
@@ -67,14 +123,13 @@ if [[ ! -d "/mnt/$DESTDISK" \
      || "$DESTDISK" != disk[1-9] && "$DESTDISK" != disk[1-9][0-9] && "$DESTDISK" != "cache" \
    ]]
 then
-  echo "'$3' is not a valid disk."
-  usage
+  echo "'$3' is not a valid disk." >&2
+  usage >&2
   exit 1
 fi
 
-RSYNCOPTS="-i -dIWRpEAXogt --numeric-ids --inplace"
+RSYNCOPTS="-dIWRpEAXogtl --numeric-ids --inplace"
 # rsync options used:
-# -i, --itemize-changes       output a change-summary for all updates
 # -d, --dirs                  transfer directories without recursing
 # -I, --ignore-times          don't skip files that match in size and mod-time
 # -W, --whole-file            copy files whole (without delta-xfer algorithm)
@@ -86,8 +141,53 @@ RSYNCOPTS="-i -dIWRpEAXogt --numeric-ids --inplace"
 # -o, --owner                 preserve owner (super-user only)
 # -g, --group                 preserve group
 # -t, --times                 preserve modification times
+# -l, --links                 copy symlinks as symlinks
 #     --numeric-ids           don't map uid/gid values by user/group name
 #     --inplace               update destination files in-place
+
+# rsync options set optionally below
+# -i, --itemize-changes       output a change-summary for all updates
+
+if [ $doit == 'true' ]; then
+  if [ $keepsrc == 'false' ]; then
+    DELCLAUSE="-delete"
+  else
+    DELCLAUSE=""
+  fi
+else
+  echo "Running in test mode, no files will be moved."
+  RSYNCOPTS="$RSYNCOPTS --dry-run"
+  DELCLAUSE=""
+fi
+
+if [ $symlinks == 'true' ]; then
+  SLCLAUSE="-o -type l"
+else
+  SLCLAUSE=""
+fi
+
+if [ $clobber == 'true' ]; then
+  DUPCLAUSE=""
+else
+  DUPCLAUSE=" \
+      ( \
+        -exec [ ! -e /mnt/$DESTDISK/{} ] ; \
+        -o \
+        -exec echo Duplicate skipped: {} ; \
+        -a \
+        -exec false ; \
+      ) "
+fi
+
+if [ $verbose -gt 0 ]; then
+  PRINTCLAUSE="-print"
+else
+  PRINTCLAUSE=""
+fi
+
+if [ $verbose -gt 1 ]; then
+  RSYNCOPTS="$RSYNCOPTS -i"
+fi
 
 echo "Merging /mnt/$SRCDISK/$MERGEDIR into /mnt/$DESTDISK/$MERGEDIR"
 cd "/mnt/$SRCDISK"
@@ -97,16 +197,11 @@ find "./$MERGEDIR" -depth \
         \( -type f ! -exec fuser -s {} \; \) \
         -o \
         \( -type d -empty \) \
+        $SLCLAUSE \
       \) \
-      -print \
-      \( \
-        -exec [ ! -f "/mnt/$DESTDISK/{}" ] \; \
-        -o \
-        -exec echo "Duplicate skipped: {}" \; \
-        -a \
-        -exec false \; \
-      \) \
+      $PRINTCLAUSE \
+      $DUPCLAUSE \
       -exec rsync $RSYNCOPTS {} "/mnt/${DESTDISK}/" \; \
-      -delete
+      $DELCLAUSE
 
 echo "diskmv finished"
