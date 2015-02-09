@@ -169,8 +169,17 @@ fi
 if [ $clobber == 'true' ]; then
   DUPCLAUSE=""
 else
+  # This duplicate clause as annoyingly complicated:
+  # If the specified file is a directory on the destination disk or if the 
+  #   specified file does not exist on the destination disk, then the duplicate
+  #   clause is finished and the next clause in the find statement is processed.
+  # Otherwise, some output is printed and false is returned so the rest of the
+  #   clauses in the find statement are not processed and the file is not
+  #   copied or moved.
   DUPCLAUSE=" \
       ( \
+        -exec [ -d /mnt/$DESTDISK/{} ] ; \
+        -o \
         -exec [ ! -e /mnt/$DESTDISK/{} ] ; \
         -o \
         -exec echo Duplicate skipped: {} ; \
