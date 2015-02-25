@@ -14,7 +14,7 @@ directory    Any directory that is contained in the user share file system.
              relative to the current directory or the /mnt/user/ directory.  
 
 disk#        Any valid disk in the unraid array. Optional: if no disk is 
-             specified, $0 will determine the destination disk based on
+             specified, consld8 will determine the destination disk based on
              max usage and available free space.
 
 options:
@@ -23,6 +23,7 @@ options:
   -f    Override test mode and force valid moves to be performed.
   -v    Print more information.
   -q    Print less information.
+
 EOF
 }
 

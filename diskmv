@@ -212,3 +212,9 @@ find "./$MERGEDIR" -depth \
       $DELCLAUSE
 
 echo "diskmv finished"
+
+if [ ! $doit == 'true' ]; then
+  echo "... but it ran in test mode"
+fi
+
+echo
