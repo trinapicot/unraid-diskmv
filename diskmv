@@ -1,7 +1,7 @@
 #!/bin/bash
 # diskmv - Move an unRAID user share directory from one disk to another
 #
-# usage: diskmv directory srcdisk destdisk
+# usage: diskmv [options] directory srcdisk destdisk
 #
 # A find/rsync structure is used to copy files and directories and then 
 # delete only if the copy succeed, similar to the unRAID mover script.
@@ -9,9 +9,7 @@
 usage(){
 cat << EOF
 
-usage: diskmv directory srcdisk destdisk
-
-All parameters are required
+usage: diskmv [options] directory srcdisk destdisk
 
 directory    Any directory that is contained in the user share file system.
              It can be specified as an absolute or relative path and can be 
@@ -39,7 +37,7 @@ EOF
 
 [ ${DEBUG:=0} -gt 0 ] && set -x -v
 
-doit='true'   # Default to take action instead of dry-run
+doit='false'   # Default to dry-run
 keepsrc='false'   # Delete source files by default if copy works
 symlinks='false'  # Default rsync to not copy symlinks as symlinks
 clobber='false'   # Default to skip duplicates

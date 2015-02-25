@@ -148,7 +148,7 @@ do
   if [ -d "$d/$SRCDIR" -a "/mnt/$DESTDISK" != "$d" ]; then
     [ $verbose -gt 0 ] && echo "Merge $d/$SRCDIR onto $DESTDISK"
     if [ $doit == 'true' ]; then
-      diskmv "$SRCDIR" "$d" "$DESTDISK"
+      diskmv -f "$SRCDIR" "$d" "$DESTDISK"
     else
       echo "Running in test mode, no files moved."
     fi
