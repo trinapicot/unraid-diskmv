@@ -28,6 +28,7 @@ Options:
 -k	keep source files, do not delete after successful copy
 -l	link, copy symlinks as symlinks, default is to ignore symlinks
 -c	clobber, duplicates on destination will be overwritten
+-s      small, only move files smaller than 4096 bytes
 -v	verbose, output more information
 -q	quiet, output less information
 -h	help, print this help message
@@ -37,11 +38,13 @@ EOF
 
 [ ${DEBUG:=0} -gt 0 ] && set -x -v
 
-doit='false'   # Default to dry-run
+doit='false'      # Default to dry-run
 keepsrc='false'   # Delete source files by default if copy works
 symlinks='false'  # Default rsync to not copy symlinks as symlinks
 clobber='false'   # Default to skip duplicates
-verbose=1	# Default to output some but not all info
+small='false'     # Default to not limit file size
+maxsize=4k        # Default to 4096 byte max file size for small files
+verbose=1	  # Default to output some but not all info
 
 while :; do
   case "$1" in
@@ -63,6 +66,9 @@ while :; do
       ;;
     -c|--clobber) # Clobber duplicates on destination
       clobber='true'
+      ;;
+    -s|--small) # Only move files smaller than 4096 bytes
+      small='true'
       ;;
     -v|--verbose)
       verbose=$((verbose + 1)) # Each -v argument adds 1 to verbosity
@@ -186,6 +192,12 @@ else
       ) "
 fi
 
+if [ "$small" == 'true' ]; then
+  SIZECLAUSE="-size -$maxsize"
+else
+  SIZECLAUSE=""
+fi
+
 if [ $verbose -gt 0 ]; then
   PRINTCLAUSE="-print"
 else
@@ -196,12 +208,12 @@ if [ $verbose -gt 1 ]; then
   RSYNCOPTS="$RSYNCOPTS -i"
 fi
 
-echo "Merging /mnt/$SRCDISK/$MERGEDIR into /mnt/$DESTDISK/$MERGEDIR"
+echo "Moving /mnt/$SRCDISK/$MERGEDIR into /mnt/$DESTDISK/$MERGEDIR"
 cd "/mnt/$SRCDISK"
 
 find "./$MERGEDIR" -depth \
       \( \
-        \( -type f ! -exec fuser -s {} \; \) \
+        \( -type f $SIZECLAUSE ! -exec fuser -s {} \; \) \
         -o \
         \( -type d -empty \) \
         $SLCLAUSE \
