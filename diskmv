@@ -36,7 +36,8 @@ Options:
 -k	keep source files, do not delete after successful copy
 -l	link, copy symlinks as symlinks, default is to ignore symlinks
 -c	clobber, duplicates on destination will be overwritten
--s N    small, only move files smaller than N kilobytes
+-s N    small, only move files less than or equal to N kilobytes
+-e EXT  only move files with extensions in the comma separated list EXT
 -v	verbose, output more information
 -q	quiet, output less information
 -h	help, print this help message
@@ -79,6 +80,11 @@ while :; do
       maxsize="$2"
       shift
       ;;
+    -e|--extension) # Only move files smaller than 4096 bytes
+      extonly='true'
+      extlist="$2"
+      shift
+      ;;
     -v|--verbose)
       verbose=$((verbose + 1)) # Each -v argument adds 1 to verbosity
       ;;
@@ -96,6 +102,14 @@ while :; do
   esac
   shift
 done
+
+if [ "$extonly" == 'true' ]; then
+  if [ -z "$extlist" ]; then
+    echo "The -e (--extension) option requires a list of extensions." >&2
+    usage >&2
+    exit 1
+  fi
+fi
 
 if [ "$small" == 'true' ]; then
   if [ -z "$maxsize" ]; then
@@ -215,8 +229,25 @@ else
       ) "
 fi
 
+if [ "$extonly" == 'true' ]; then
+  EXTCLAUSE=('(')  #Start the extension clause with paren stored in an array
+  THEREST="$extlist"   #Initialize THEREST
+  while true; do
+    EXT="${THEREST%%,*}"   #Get the first extension
+    THEREST="${THEREST#*,}"   #Remove the first extension
+    EXTCLAUSE+=( -name '*.'"$EXT" )  #Add a -name '*.EXT' test
+    if [[ "$EXT" == "$THEREST" ]]; then  #There is only one ext left in the list
+      EXTCLAUSE+=(')')  #finish off the extension clause with close paren
+      break  #Done with the while loop
+    fi
+    EXTCLAUSE+=(-o)   #Add an "or" operator for the next extension
+  done
+else
+  EXTCLAUSE=( )
+fi
+
 if [ "$small" == 'true' ]; then
-  SIZECLAUSE="-size -$((maxsize*1024))c"
+  SIZECLAUSE="-size -$((maxsize*1024+1))c"
 else
   SIZECLAUSE=""
 fi
@@ -236,7 +267,7 @@ cd "/mnt/$SRCDISK"
 
 find "./$MERGEDIR" -depth \
       \( \
-        \( -type f $SIZECLAUSE ! -exec fuser -s {} \; \) \
+        \( -type f $SIZECLAUSE "${EXTCLAUSE[@]}" ! -exec fuser -s {} \; \) \
         -o \
         \( -type d -empty \) \
         $SLCLAUSE \
