@@ -9,7 +9,7 @@
 usage(){
 cat << EOF
 
-usage: diskmv [-t|-f|-k|-l|-c|-s N|-v|-q|-h] directory srcdisk destdisk
+usage: diskmv [-t|-f|-k|-l|-c|-s N|-e EXT|-v|-q|-h] directory srcdisk destdisk
 
 EOF
 }
@@ -169,6 +169,12 @@ then
   exit 1
 fi
 
+if [[ "$DESTDISK" == "$SRCDISK" ]]; then
+  echo "Destination and Source disks cannot be the same." >&2
+  usage >&2
+  exit 1
+fi
+
 RSYNCOPTS="-dIWRpEAXogtl --numeric-ids --inplace"
 # rsync options used:
 # -d, --dirs                  transfer directories without recursing
@@ -209,6 +215,7 @@ fi
 
 if [ $clobber == 'true' ]; then
   DUPCLAUSE=""
+  RSYNCOPTS+=' --force'
 else
   # This duplicate clause as annoyingly complicated:
   # If the specified file is a directory on the destination disk or if the 
@@ -235,7 +242,7 @@ if [ "$extonly" == 'true' ]; then
   while true; do
     EXT="${THEREST%%,*}"   #Get the first extension
     THEREST="${THEREST#*,}"   #Remove the first extension
-    EXTCLAUSE+=( -name '*.'"$EXT" )  #Add a -name '*.EXT' test
+    EXTCLAUSE+=( -iname '*.'"$EXT" )  #Add a -name '*.EXT' test
     if [[ "$EXT" == "$THEREST" ]]; then  #There is only one ext left in the list
       EXTCLAUSE+=(')')  #finish off the extension clause with close paren
       break  #Done with the while loop
