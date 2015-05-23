@@ -1,9 +1,9 @@
 unraid-diskmv
 =============
 
-A set of utilities to move unRAID user share directories between disks. Currently consists of two bash scripts:
+A set of utilities to move unRAID user share files between disks. Currently consists of two bash scripts:
 
-* `diskmv` will move a user share directory from one disk to another. It uses a find/rsync command similar to what is found in the standard mover script. It is suitable for merging a user share directory onto a disk that already contains that directory.  Files that have duplicate file names  on the destination disk will not be moved. By default, `diskmv` will run in test mode and display some information about how directories would be moved, but will not actually move files unless forced.
+* `diskmv` will move a user share file or directory from one disk to another. It uses a find/rsync command similar to what is found in the standard mover script. It is suitable for merging a user share directory onto a disk that already contains that directory.  Files that have duplicate file names  on the destination disk will not be moved. By default, `diskmv` will run in test mode and display some information about how files would be moved, but will not actually move files unless forced.
 * `consld8` can consolidate a user share directory from multiple disks onto one disk. If a destination disk is not specified, it will pick the best disk based on max usage and available space. By default, `consld8` will run in test mode and display some information about how directories would be moved, but will not actually move files unless forced. `diskmv` is required to actually move files.
 
 Example usage:
