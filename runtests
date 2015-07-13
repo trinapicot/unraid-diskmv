@@ -1,0 +1,484 @@
+#!/bin/bash
+# Runtests will run a series of tests on unraid diskmv utilities
+
+
+################################################################################
+### Configurable Parameters
+################################################################################
+
+# These can be overridden with environment variables
+
+# User share in which the test data files will be created
+testShare=${TESTSHARE:-'testdata'}
+
+# Sub-directory in which the test data files will be created
+testDir=${TESTDIR:-'diskmv-testdata'}
+
+# Disk from which the test data files will be moved
+srcDisk=${SRCDISK:-'cache'}
+
+# Disk on to which the test data files will be moved 
+dstDisk=${DSTDISK:-'disk7'}
+
+# Files in which to save the output of tests
+tStdOut=${TSTDOUT:-'test_stdout'}
+tErrOut=${TERROUT:-'test_errout'}
+
+################################################################################
+### Function Definitions
+################################################################################
+
+header(){
+  # A function to put some test header text in the output files
+
+  (
+  echo
+  echo "***********************************************************************"
+  echo "*** $1    $(date +'%Y%m%d %H:%M:%S')"
+  echo "***********************************************************************"
+  echo
+  ) | tee -a "${tStdOut}" | tee -a "${tErrOut}" #Redirect stdout to the 2 output files
+
+}
+
+runcmd(){
+  # A function to execute test commands and document it in the output files
+
+  echo "# Test command: $@" > >(tee -a "$tStdOut") 2> >(tee -a "$tErrOut")
+  echo > >(tee -a "$tStdOut") 2> >(tee -a "$tErrOut")
+  "$@" >> "$tStdOut" 2>> "$tErrOut"
+  EXITCODE=$?
+  # Method that keeps stdout and stderr going to the terminal also:
+  #"$@" > >(tee -a "$tStdOut") 2> >(tee -a "$tErrOut")
+
+  echo >> "$tStdOut" 2>> "$tErrOut"
+
+}
+
+evalexit(){
+  # A function to evaluate exit codes from test commands
+
+  if [[ "$EXITCODE" == 0 ]]; then
+    echo "Test command exited normally."
+  else
+    echo "Test command exited abnormally with exit code: $EXITCODE"
+  fi
+  EXPECTCODE=${1:-0} # The first positional parameter if it exist, otherwise 0
+  #echo "EXITCODE: $EXITCODE, EXPECTCODE: $EXPECTCODE"
+  if [[ "$EXITCODE" == "$EXPECTCODE" ]]; then
+    testFlag='pass'
+    ((nExitPass+=1))
+    echo "Exited as expected."
+  else
+    testFlag='fail'
+    ((nExitFail+=1))
+    echo "Failed to exit as expected."
+  fi
+  echo
+
+}
+
+evaltest(){
+  # A funtion to evaluate test results
+
+  if [[ $testFlag == 'pass' ]]; then
+    echo "Test ${green}Passed${reset}"; ((nTestPass+=1))
+  else
+    if [[ -d "${srcPath}" ]]; then 
+      echo "Source Directory"
+      tree "${srcPath}"
+    else
+      echo "Source Directory does not exist"
+    fi
+    echo
+    if [[ -d "${dstPath}" ]]; then 
+      echo "Destination Directory"
+      tree "${dstPath}"
+    else
+      echo "Destination Directory does not exist"
+    fi
+    echo
+    echo "Test ${red}Failed${reset}"; ((nTestFail+=1))
+    sleep 3
+  fi
+  echo
+
+  # Reset test flag
+  testFlag=""
+
+}
+
+################################################################################
+### Initialization
+################################################################################
+
+# Initialize output files
+
+if [[ -e "$tStdOut" ]]; then 
+  echo "Output file: '${tStdOut}' already exists. Moving..."
+  # Get modified date/time
+  mDate=$(date --date="@"$(stat --printf="%Y" "$tStdOut") "+%Y%m%d_%H%M%S")
+  mv -v "$tStdOut"{,".$mDate"}
+fi
+if [[ -e "$tErrOut" ]]; then 
+  echo "Output file: '${tErrOut}' already exists. Moving..."
+  # Get modified date/time
+  mDate=$(date --date="@"$(stat --printf="%Y" "$tErrOut") "+%Y%m%d_%H%M%S")
+  mv -v "$tErrOut"{,".$mDate"}
+fi
+
+# Make sure source and destination disks are there
+if [[ ! -d "/mnt/$srcDisk" ]]; then
+  echo "Specified source directory does not exist: '/mnt/$srcDisk'" >&2
+  exit 1
+fi
+
+if [[ ! -d "/mnt/$dstDisk" ]]; then
+  echo "Specified destination directory does not exist: '/mnt/$dstDisk'" >&2
+  exit 1
+fi
+
+# Assemble some more complete path parameters
+testPath="${testShare}/${testDir}/"
+srcPath="/mnt/${srcDisk}/${testPath}"
+dstPath="/mnt/${dstDisk}/${testPath}"
+
+# Initialze some counts
+nExitPass=0
+nExitFail=0
+nTestPass=0
+nTestFail=0
+
+# Parameters that expand to make fancy colored output
+red=`tput setaf 1`
+green=`tput setaf 2`
+reset=`tput sgr0`
+echo "${red}red text ${green}green text${reset}"
+
+
+# Make sure no existing data will be over-written or deleted
+if [[ -e "/mnt/user/$testShare/$testDir" ]]; then
+  echo "Specified test data directory cannot be used." >&2
+  echo "Delete existing file: '$testPath' or specify a different name in this script" >&2
+  exit 1
+else
+  mkdir --parents "${srcPath}"
+fi
+
+################################################################################
+### Create Data
+################################################################################
+
+
+################################################################################
+### Do some tests (finally)
+################################################################################
+
+################################################################################
+header  "Help option"
+
+runcmd diskmv -h
+evalexit 0  #Expect exit code 0
+evaltest
+
+################################################################################
+header "Default mode is test"
+
+touch "${srcPath}a"
+
+runcmd diskmv "$testPath" "$srcDisk" "$dstDisk"
+evalexit 0  #Expect exit code 0
+# Test criteria
+if [[ ! -f "${srcPath}a" ]] || [[ -f "${dstPath}a" ]]; then
+  testFlag='fail'
+fi
+evaltest
+
+################################################################################
+header ""
+
+################################################################################
+header "Keep source file option"
+
+mkdir -p "${srcPath}"{rst,'Archer (2009)'}
+mkdir -p "${dstPath}rst"
+touch "${srcPath}"{a,b,"e f"}
+touch "${dstPath}"{c,d}
+touch "${srcPath}Archer (2009)/"{testfile.nfo,testfile.mp4}
+
+runcmd diskmv -f -k "$testPath" "$srcDisk" "$dstDisk"
+evalexit 0
+# Test criteria
+if [[ ! -f "${srcPath}a" ]] ||
+   [[ ! -f "${srcPath}b" ]] ||
+   [[ ! -f "${srcPath}e f" ]] ||
+   [[ ! -f "${srcPath}Archer (2009)/testfile.mp4" ]] ||
+   [[ ! -f "${srcPath}Archer (2009)/testfile.nfo" ]] ||
+   [[ ! -d "${srcPath}rst" ]] ||
+   [[ ! -f "${dstPath}a" ]] ||
+   [[ ! -f "${dstPath}b" ]] ||
+   [[ ! -f "${dstPath}c" ]] ||
+   [[ ! -f "${dstPath}d" ]] ||
+   [[ ! -f "${dstPath}e f" ]] ||
+   [[ ! -f "${dstPath}Archer (2009)/testfile.mp4" ]] ||
+   [[ ! -f "${dstPath}Archer (2009)/testfile.nfo" ]] ||
+   [[ ! -d "${dstPath}rst" ]]
+then
+  testFlag='fail'
+fi
+evaltest
+
+rm -r "${dstPath}"
+
+################################################################################
+header "Move a bunch of files"
+
+mkdir -p "${dstPath}"
+touch "${dstPath}"{c,d}
+
+runcmd diskmv -f "$testPath" "$srcDisk" "$dstDisk"
+evalexit 0
+# Test criteria
+if [[ -d "${srcPath}" ]] ||
+   [[ ! -f "${dstPath}a" ]] ||
+   [[ ! -f "${dstPath}b" ]] ||
+   [[ ! -f "${dstPath}c" ]] ||
+   [[ ! -f "${dstPath}d" ]] ||
+   [[ ! -f "${dstPath}e f" ]] ||
+   [[ ! -f "${dstPath}Archer (2009)/testfile.mp4" ]] ||
+   [[ ! -f "${dstPath}Archer (2009)/testfile.nfo" ]] ||
+   [[ ! -d "${dstPath}rst" ]]
+then
+  testFlag='fail'
+fi
+evaltest
+
+rm -r "${dstPath}"
+
+################################################################################
+header "Link option"
+
+mkdir -p "${srcPath}"
+touch "${srcPath}"{a,b}
+ln -s "/mnt/user/${testPath}a" "${srcPath}alink"
+ln -s "${srcPath}b" "${srcPath}blink"
+
+runcmd diskmv -f "$testPath" "$srcDisk" "$dstDisk"
+evalexit 0
+# Test criteria
+if [[ ! -L "${srcPath}alink" ]] ||
+   [[ ! -L "${srcPath}blink" ]] ||
+   [[ -L "${dstPath}alink" ]] ||
+   [[ -L "${dstPath}blink" ]] ||
+   [[ -f "${srcPath}a" ]] ||
+   [[ ! -f "${dstPath}a" ]]
+then
+  testFlag='fail'
+fi
+evaltest
+
+runcmd diskmv -f -l "$testPath" "$srcDisk" "$dstDisk"
+evalexit 0
+# Test criteria
+if [[ -L "${srcPath}alink" ]] ||
+   [[ -L "${srcPath}blink" ]] ||
+   [[ ! -L "${dstPath}alink" ]] ||
+   [[ ! -L "${dstPath}blink" ]] ||
+   [[ -f "${srcPath}a" ]] ||
+   [[ ! -f "${dstPath}a" ]]
+then
+  testFlag='fail'
+fi
+evaltest
+
+################################################################################
+header "File with same name on source and destination"
+
+mkdir -p "${srcPath}"
+echo "sourcefile" > "${srcPath}e f"
+echo "destinationfile" > "${dstPath}e f"
+
+runcmd diskmv -f "$testPath" "$srcDisk" "$dstDisk"
+evalexit 0  #Expect exit code 0
+# Test criteria
+if [[ -f "${dstPath}e f" ]]; then
+  read line < "${dstPath}e f"
+  if [[ "$line" != 'destinationfile' ]]; then
+    testFlag='fail'
+  fi
+else
+  testFlag='fail'
+fi
+if [[ ! -f "${srcPath}e f" ]]; then
+  testFlag='fail'
+fi
+evaltest
+
+################################################################################
+header "Clobber option"
+
+runcmd diskmv -f -c "$testPath" "$srcDisk" "$dstDisk"
+evalexit 0  #Expect exit code 0
+# Test criteria
+if [[ -f "${dstPath}e f" ]]; then
+  read line < "${dstPath}e f"
+  if [[ "$line" != 'sourcefile' ]]; then
+    testFlag='fail'
+  fi
+fi
+if [[ -f "${srcPath}e f" ]]; then
+  testFlag='fail'
+fi
+evaltest
+
+################################################################################
+header "File extension option"
+
+mkdir -p "${srcPath}/ext sub dir"
+touch "${srcPath}ext sub dir/exttest."{'ha sh',nfo,txt,SRR}
+touch "${srcPath}exttest."{'hash',nfo,txt,srr}
+
+runcmd diskmv -f -e 'nfo,ha sh,srr' "$testPath" "$srcDisk" "$dstDisk"
+evalexit 0  #Expect exit code 0
+# Test criteria
+if [[ ! -f "${srcPath}exttest.txt" ]] ||
+   [[ ! -f "${srcPath}ext sub dir/exttest.txt" ]] ||
+   [[ ! -f "${srcPath}exttest.hash" ]] ||
+   [[ ! -f "${dstPath}ext sub dir/exttest.ha sh" ]] ||
+   [[ ! -f "${dstPath}ext sub dir/exttest.nfo" ]] ||
+   [[ ! -f "${dstPath}ext sub dir/exttest.SRR" ]] ||
+   [[ ! -f "${dstPath}exttest.nfo" ]] ||
+   [[ ! -f "${dstPath}exttest.srr" ]] ||
+   [[ -f "${dstPath}exttest.txt" ]] ||
+   [[ -f "${dstPath}ext sub dir/exttest.txt" ]] ||
+   [[ -f "${dstPath}exttest.hash" ]] ||
+   [[ -f "${srcPath}ext sub dir/exttest.ha sh" ]] ||
+   [[ -f "${srcPath}ext sub dir/exttest.nfo" ]] ||
+   [[ -f "${srcPath}ext sub dir/exttest.SRR" ]] ||
+   [[ -f "${srcPath}exttest.nfo" ]] ||
+   [[ -f "${srcPath}exttest.srr" ]]
+then
+  testFlag='fail'
+fi
+evaltest
+
+################################################################################
+header "Small file option"
+
+mkdir -p "${srcPath}"
+dd if=/dev/zero of="${srcPath}5k_file" bs=1k count=5 > /dev/null 2>&1
+dd if=/dev/zero of="${srcPath}4k_file" bs=1k count=4 > /dev/null 2>&1
+dd if=/dev/zero of="${srcPath}3k_file" bs=1k count=3 > /dev/null 2>&1
+
+runcmd diskmv -f -s 4 "$testPath" "$srcDisk" "$dstDisk"
+evalexit 0  #Expect exit code 0
+# Test criteria
+if [[ ! -f "${srcPath}5k_file" ]] ||
+   [[ -f "${dstPath}5k_file" ]] ||
+   [[ -f "${srcPath}4k_file" ]] ||
+   [[ ! -f "${dstPath}4k_file" ]] ||
+   [[ -f "${srcPath}3k_file" ]] ||
+   [[ ! -f "${dstPath}3k_file" ]]
+then
+  testFlag='fail'
+fi
+evaltest
+
+################################################################################
+header "Source has non-empty directory that conflicts with file on destination"
+
+echo "This file was created on ${dstPath}" > "${dstPath}xyz zyx"
+mkdir -p "${srcPath}xyz zyx"
+touch "${srcPath}xyz zyx/a"
+
+runcmd diskmv -f "$testPath" "$srcDisk" "$dstDisk"
+evalexit 0  #Expect exit code 0
+# Test criteria
+if [[ ! -d "${srcPath}xyz zyx" ]] ||
+   [[ -d "${dstPath}xyz zyx" ]] ||
+   [[ ! -f "${dstPath}xyz zyx" ]] 
+then
+  testFlag='fail'
+fi
+evaltest
+
+runcmd diskmv -c -f "$testPath" "$srcDisk" "$dstDisk"
+evalexit 0  #Expect exit code 0
+# Test criteria
+if [[ -d "${srcPath}xyz zyx" ]] || [[ ! -d "${dstPath}xyz zyx" ]]; then
+  testFlag='fail'
+fi
+evaltest
+
+################################################################################
+header "Source has regular file that conflicts with directory on destination"
+
+mkdir -p "${dstPath}abc"
+mkdir -p "${srcPath}"
+echo "This file was created on ${dstPath}" > "${dstPath}abc/x"
+echo "This file was created on ${srcPath}" > "${srcPath}abc"
+
+runcmd diskmv -f "$testPath" "$srcDisk" "$dstDisk"
+evalexit 0  #Expect exit code 0, but should be error output from rsync
+# Test criteria
+if [[ ! -f "${srcPath}abc" ]] ||
+   [[ -f "${dstPath}abc" ]] ||
+   [[ ! -d "${dstPath}abc" ]]
+then
+  testFlag='fail'
+fi
+evaltest
+
+runcmd diskmv -c -f "$testPath" "$srcDisk" "$dstDisk"
+evalexit 0  #Expect exit code 0
+# Test criteria
+if [[ -f "${srcPath}abc" ]] || [[ ! -f "${dstPath}abc" ]]; then
+  testFlag='fail'
+fi
+evaltest
+
+################################################################################
+header "Specify file instead of directory on user share"
+
+mkdir -p "${srcPath}"
+touch "${srcPath}jbr"
+#echo "sourcefile" > "${srcPath}e f"
+#echo "destinationfile" > "${dstPath}e f"
+
+runcmd diskmv -f "${testPath}jbr" "$srcDisk" "$dstDisk"
+evalexit 0  #Expect exit code 0
+# Test criteria
+if [[ ! -f "${dstPath}jbr" ]]; then
+  testFlag='fail'
+fi
+if [[ -f "${srcPath}jbr" ]]; then
+  testFlag='fail'
+fi
+evaltest
+
+################################################################################
+#header "See how a failed exit code works"
+
+#runcmd diskmv -z
+#evalexit 0  #Expect exit code 0
+#evaltest
+
+
+################################################################################
+### Summarize test results
+################################################################################
+
+echo
+echo "**************************************************************"
+echo
+echo "Test Summary:"
+echo "Exit codes passed: ${nExitPass}"
+echo "Exit codes failed: ${nExitFail}"
+echo
+echo "Test passed: ${nTestPass}"
+echo "Test failed: ${nTestFail}"
+
+################################################################################
+### Clean up
+################################################################################
+rm -r ${srcPath} ${dstPath} 2>/dev/null

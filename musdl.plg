@@ -1,0 +1,150 @@
+<?xml version='1.0' standalone='yes'?>
+
+<!DOCTYPE PLUGIN [
+<!ENTITY name      "MUSDL">
+<!ENTITY author    "Freddie">
+<!ENTITY version   "2015.07.12">
+<!ENTITY pluginURL "https://github.com/trinapicot/unraid-diskmv/raw/master/musdl.plg">
+]>
+
+<PLUGIN  name="&name;"
+         author="&author;"
+         version="&version;"
+         pluginURL="&pluginURL;">
+
+<CHANGES>
+  ## MUSDL Version History
+
+  2015.07.12 Initial release
+</CHANGES>
+
+<!--
+2015-07-12 - Created for unRAID 6 (64 bit)
+
+-->
+
+<FILE Name="/boot/config/plugins/&name;/diskmv">
+<URL>https://raw.githubusercontent.com/trinapicot/unraid-diskmv/v0.2.0/diskmv</URL>
+</FILE>
+
+<FILE Name="/usr/local/sbin/diskmv" Run="chmod +x">
+<LOCAL>/boot/config/plugins/&name;/diskmv</LOCAL>
+</FILE>
+
+<FILE Name="/boot/config/plugins/&name;/consld8">
+<URL>https://raw.githubusercontent.com/trinapicot/unraid-diskmv/v0.2.0/consld8</URL>
+</FILE>
+
+<FILE Name="/usr/local/sbin/consld8" Run="chmod +x">
+<LOCAL>/boot/config/plugins/&name;/consld8</LOCAL>
+</FILE>
+
+<FILE Name="/usr/local/emhttp/plugins/&name;/Diskmv.page">
+<INLINE>
+<![CDATA[
+
+Menu="DiskUtil:10"
+Title="diskmv"
+Icon="diskmv.png"
+---
+
+<? 
+$cmd="/usr/local/sbin/diskmv";
+$pattern = '<^(/mnt/(?:disk\d{1,2}|cache))/{0,}(.*)>';
+$testMatch = preg_match($pattern, $dir, $matches);
+$diskDir = $matches[1];
+$userDir = $matches[2];
+?>
+
+<script>
+$(function() {
+  showStatus("<?=$cmd?>");
+});
+</script>
+
+<form markdown="1" method="POST" action="/update.php" target="progressFrame">
+
+<? $pid = exec("pidof -s -x '$cmd'") ?>
+<? if ($pid): // Not OK to start a move ?>
+
+There is a diskmv process already running &mdash; it must finish before another can be submitted.
+
+If you must:
+<input type="hidden" name="#command" value="/usr/bin/pkill -TERM -P $(pidof -s -x <?=$cmd?>)" >
+<input type="submit" name="abort" value="Abort" >
+
+<? else: // OK to start a move ?>
+
+<input type="hidden" name="#command" value="<?=$cmd?>">
+<input type="hidden" name="#arg[1]" value="'<?=$userDir;?>'" >
+
+Share Directory:
+: <input type="text" name="sourceDir" size="40" maxlength="80" value="<?=$userDir;?>" readonly>
+
+Source Disk: 
+: <select id="sourceDisk" name="#arg[2]" size="1">
+<?foreach ($disks as $disk):?>
+<?if ($disk['type']!='Flash' && $disk['fsStatus']=='Mounted'):?>
+<?=mk_option($diskDir,"/mnt/{$disk['name']}",my_disk($disk['name']))?>
+<?endif;?>
+<?endforeach;?>
+</select>
+
+Destination Disk: 
+: <select id="destinationDisk" name="#arg[3]" size="1">
+<?foreach ($disks as $disk):?>
+<?if ($disk['type']!='Flash' && $disk['status']=='DISK_OK'):?>
+<?=mk_option("/mnt/cache","/mnt/{$disk['name']}",my_disk($disk['name']))?>
+<?endif;?>
+<?endforeach;?>
+</select>
+
+Log Output:
+<?$logfile="/var/tmp/diskmv.log"?>
+: <select id="output" name="#arg[4]" size="1" onchange="$('.tempFile').toggle();">
+<option value=" > <?=$logfile?> 2>&1 &">Temp File</option>
+<option value=" 2>&1 | logger -t diskmv &">Syslog</option>
+</select>
+<span class="tempFile">Temp File: <?=$logfile?></span>
+
+Test Mode:
+: <select id="testMode" name="#arg[0]" size="1">
+<option value="-t">Yes</option>
+<option value="" disabled>No</option>
+</select>
+
+> Test mode will perform a "dry run" and list all files that would be moved.
+
+&nbsp;
+: <input type="submit" value="Submit">
+<?php endif; // end of OK to start move ?>
+</form>
+
+]]>
+
+</INLINE>
+</FILE>
+
+<!--
+create plugin README.md file
+-->
+<FILE Name="/usr/local/emhttp/plugins/&name;/README.md">
+<INLINE>
+**MUSDL**
+
+Manage User Share Disk Location. A set of utilities to move user share directories between disks.
+</INLINE>
+</FILE>
+
+<!--
+The 'remove' script.
+-->
+<FILE Run="/bin/bash" Method="remove">
+<INLINE>
+rm -f -r /usr/local/emhttp/plugins/&name;
+rm -f -r /boot/config/plugins/&name;
+rm -f /usr/local/sbin/{diskmv,consl8} 2>/dev/null
+</INLINE>
+</FILE>
+
+</PLUGIN>
