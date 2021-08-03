@@ -151,8 +151,7 @@ fi
 sourceDisk="${2#/mnt/}"    #Remove any leading /mnt/ prefix
 sourceDisk="${sourceDisk%%/*}"    #Remove any trailing path
 if [[ ! -d "/mnt/$sourceDisk" \
-     || "$sourceDisk" != disk[1-9] && "$sourceDisk" != disk[1-9][0-9] && "$sourceDisk" != "cache" \
-   ]]
+      || "$sourceDisk" = remotes || "$sourceDisk" = user* ]]
 then
   echo "'$2' is not a valid disk." >&2
   usage >&2
@@ -161,9 +160,7 @@ fi
 
 destDisk="${3#/mnt/}"    #Remove any leading /mnt/ prefix
 destDisk="${destDisk%%/*}"    #Remove any trailing path
-if [[ ! -d "/mnt/$destDisk" \
-     || "$destDisk" != disk[1-9] && "$destDisk" != disk[1-9][0-9] && "$destDisk" != "cache" \
-   ]]
+if [[ ! -d "/mnt/$destDisk" || "$destDisk" = remotes || "$sourceDisk" = user* ]]
 then
   echo "'$3' is not a valid disk." >&2
   usage >&2

@@ -88,7 +88,7 @@ then
 else
   DESTDISK="${2#/mnt/}"    #Remove any leading /mnt/ prefix
   DESTDISK="${DESTDISK%%/*}"    #Remove any trailing path
-  if [[ ! -d "/mnt/$DESTDISK" || "$DESTDISK" != disk[1-9] && "$DESTDISK" != disk[1-9][0-9] ]]
+  if [[ ! -d "/mnt/$DESTDISK" || "$DESTDISK" = remotes || "$DESTDISK" = user* ]]
   then
     echo "'$2' is not a valid destination disk." >&2
     usage >&2
